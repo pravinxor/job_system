@@ -1,4 +1,7 @@
-use std::{error::Error, sync::atomic::AtomicUsize};
+use std::{
+    error::Error,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -11,7 +14,7 @@ struct JobData {
 impl JobData {
     fn new(r#type: usize, channels: usize) -> Self {
         Self {
-            id: NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             r#type,
             channels,
         }

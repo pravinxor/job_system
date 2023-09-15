@@ -9,12 +9,12 @@ struct RenderJob {
 impl Job for RenderJob {
     fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut total = 0;
-        total += self.render_data.iter().sum();
-        total += self.render_data.iter().sum();
+        total += self.render_data.iter().sum::<i64>();
+        total += self.render_data.iter().sum::<i64>();
 
         // The total goes in the first index, because that's how it was implemented in the cpp?
         if let Some(first_data_idx) = self.render_data.first_mut() {
-            first_data_idx = total;
+            *first_data_idx = total;
         }
 
         eprintln!("Job {} has been executed", self.data.id);
@@ -29,6 +29,6 @@ impl Job for RenderJob {
     }
 
     fn get_unique_id(&self) -> usize {
-        return self.data.id;
+        self.data.id
     }
 }

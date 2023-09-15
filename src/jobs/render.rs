@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::job::{Job, JobData};
 
 struct RenderJob {
@@ -7,7 +9,7 @@ struct RenderJob {
 }
 
 impl Job for RenderJob {
-    fn execute(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut total = 0;
         total += self.render_data.iter().sum::<i64>();
         total += self.render_data.iter().sum::<i64>();
@@ -21,7 +23,7 @@ impl Job for RenderJob {
         Ok(())
     }
 
-    fn complete_callback(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn complete_callback(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         if let Some(sum) = self.render_data.first() {
             eprintln!("Job {} Calculated sum: {}", self.data.id, sum)
         }

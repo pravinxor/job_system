@@ -24,11 +24,11 @@ impl JobData {
     }
 }
 
-pub trait Job: Sync {
+pub trait Job: Send {
     /// The initial call, where job begins execution
-    fn execute(&mut self) -> Result<(), Box<dyn Error>>;
+    fn execute(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
     /// Function that is called once Job::execute() has completed (generally used for cleanup)
-    fn complete_callback(&mut self) -> Result<(), Box<dyn Error>>;
+    fn complete_callback(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
     /// Returns an id that should be unique and specific to the current job
     fn get_unique_id(&self) -> usize;
 }

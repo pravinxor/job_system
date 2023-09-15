@@ -14,7 +14,7 @@ struct CompileJob {
 }
 
 impl Job for CompileJob {
-    fn execute(&mut self) -> Result<(), Box<dyn Error>> {
+    fn execute(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let command = "make automated 2>&1";
         let process = Command::new("/bin/sh").arg("-c").arg(command).spawn()?;
         eprintln!("Job {} has been executed", self.data.id);
@@ -25,7 +25,7 @@ impl Job for CompileJob {
         Ok(())
     }
 
-    fn complete_callback(&mut self) -> Result<(), Box<dyn Error>> {
+    fn complete_callback(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
         if let Some(code) = self.return_code {
             eprintln!("Compile job {} return code {}", self.data.id, code);
         }

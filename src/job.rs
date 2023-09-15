@@ -24,7 +24,7 @@ impl JobData {
     }
 }
 
-pub trait Job {
+pub trait Job: Sync {
     /// The initial call, where job begins execution
     fn execute(&mut self) -> Result<(), Box<dyn Error>>;
     /// Function that is called once Job::execute() has completed (generally used for cleanup)

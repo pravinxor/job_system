@@ -1,5 +1,15 @@
-use crate::{job::Job, job_slave::JobSlave};
-use std::{collections::VecDeque, sync::Arc, thread};
+use crate::{job::Job, job_master::MasterMessage, job_slave::JobSlave};
+use std::{
+    collections::VecDeque,
+    error::Error,
+    io,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex, RwLock,
+    },
+    thread,
+    time::Duration,
+};
 
 pub enum JobStatus {
     JobStatusNeverSeen,
@@ -10,49 +20,52 @@ pub enum JobStatus {
     NumJobStatuses,
 }
 
-struct HistoryEntry {
+pub struct HistoryEntry {
     r#type: usize,
     status: JobStatus,
 }
 
 pub struct JobSystem {
-    worker_threads: Vec<JobSlave>,
+    slave_threads: Arc<Mutex<Vec<JobSlave>>>,
 
-    queued_jobs: Arc<VecDeque<Box<dyn Job>>>,
-    running_jobs: Arc<VecDeque<Box<dyn Job>>>,
-    completed_jobs: Arc<Vec<Box<dyn Job>>>,
+    completed_jobs: Arc<Mutex<Vec<Box<dyn Job>>>>,
 
-    history: Arc<Vec<HistoryEntry>>,
+    history: Arc<RwLock<Vec<HistoryEntry>>>,
 
     master_handle: thread::JoinHandle<()>,
+
+    /// Channel to send messages to the master thread
+    tx: Sender<MasterMessage>,
+    /// Channel for master thread to receive messages from
+    rx: Receiver<MasterMessage>,
 }
 
 impl JobSystem {
     pub fn new() -> Self {
+        let (tx, rx) = channel();
         let master_handle = thread::spawn(|| {});
 
         Self {
-            worker_threads: Vec::new(),
-            queued_jobs: Arc::new(VecDeque::new()),
-            running_jobs: Arc::new(VecDeque::new()),
-            completed_jobs: Arc::new(Vec::new()),
-            history: Arc::new(Vec::new()),
+            slave_threads: Arc::new(Mutex::new(Vec::new())),
+            completed_jobs: Arc::new(Mutex::new(Vec::new())),
+            history: Arc::new(RwLock::new(Vec::new())),
             master_handle,
+            tx,
+            rx,
         }
     }
 
-    pub fn create_slave(
-        &mut self,
-        unique_name: String,
-        channels: u64,
-    ) -> Result<(), std::io::Error> {
-        let slave = JobSlave::new(unique_name, channels)?;
-        self.worker_threads.push(slave);
+    pub fn create_slave(&mut self, unique_name: String, channels: u64) -> Result<(), io::Error> {
+        let slave = JobSlave::new(unique_name, channels, self.tx.clone())?;
+        self.slave_threads.lock().as_mut().unwrap().push(slave);
         Ok(())
     }
 
     pub fn destroy_slave(&mut self, unique_name: &str) {
-        self.worker_threads
+        self.slave_threads
+            .lock()
+            .as_mut()
+            .unwrap()
             .retain(|s| s.name().map_or(true, |name| name != unique_name))
     }
 

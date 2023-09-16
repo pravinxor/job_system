@@ -1,13 +1,15 @@
 use std::{
-    error::Error,
-    marker::PhantomData,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc::{channel, Receiver, SendError, Sender},
+        Arc,
+    },
     thread,
 };
 
-use crate::job::Job;
+use crate::{job::Job, job_master::MasterMessage};
 
-pub enum SystemMessages {
+pub enum SlaveMessage {
     Job(Box<dyn Job>),
     StopRequest,
 }
@@ -17,47 +19,62 @@ pub struct JobSlave {
     handle: Option<thread::JoinHandle<()>>,
 
     /// Channel to send instructions to slave thread
-    tx: Sender<SystemMessages>,
-
-    /// Channel to recieve results from slave thread
-    rx: Receiver<Result<Box<dyn Job>, Box<dyn Error + Send>>>,
+    tx: Sender<SlaveMessage>,
 
     /// A bitmask of the channels of jobs that may be performed by the thread
     channels: u64,
+
+    /// The number of jobs queued for completion
+    queue_len: Arc<AtomicUsize>,
 }
 
 impl JobSlave {
-    pub fn new(unique_name: String, channels: u64) -> Result<Self, std::io::Error> {
+    pub fn new(
+        unique_name: String,
+        channels: u64,
+        tx_thread: Sender<MasterMessage>,
+    ) -> Result<Self, std::io::Error> {
         let (tx_system, rx_thread) = channel();
-        let (tx_thread, rx_system) = channel();
+        let queue_len = Arc::new(AtomicUsize::new(0));
+        let ql_slave = queue_len.clone();
 
         let handle = thread::Builder::new()
             .name(unique_name)
-            .spawn(|| JobSlave::work(rx_thread, tx_thread))?;
+            .spawn(move || JobSlave::work(rx_thread, tx_thread, ql_slave))?;
 
         Ok(Self {
             handle: Some(handle),
             tx: tx_system,
-            rx: rx_system,
             channels,
+            queue_len,
         })
     }
     pub fn name(&self) -> Option<&str> {
         self.handle.as_ref()?.thread().name()
     }
 
-    fn work(rx: Receiver<SystemMessages>, tx: Sender<Result<Box<dyn Job>, Box<dyn Error + Send>>>) {
-        loop {
-            match rx.recv() {
-                Ok(message) => match message {
-                    SystemMessages::Job(mut job) => {
-                        if let Err(e) = job.execute() {
-                            tx.send(Err(e)).unwrap()
-                        }
+    pub fn submit(&self, message: SlaveMessage) -> Result<(), SendError<SlaveMessage>> {
+        if let SlaveMessage::Job(_) = message {
+            self.queue_len.fetch_add(1, Ordering::Relaxed);
+        }
+        self.tx.send(message)
+    }
+
+    /// The number of jobs in queue for the slave
+    pub fn pressure(&self) -> usize {
+        self.queue_len.load(Ordering::Relaxed)
+    }
+
+    fn work(rx: Receiver<SlaveMessage>, tx: Sender<MasterMessage>, queue_len: Arc<AtomicUsize>) {
+        while let Ok(message) = rx.recv() {
+            match message {
+                SlaveMessage::Job(mut job) => {
+                    if let Err(e) = job.execute() {
+                        tx.send(MasterMessage::RecvCompletedJob(Err(e))).unwrap();
                     }
-                    SystemMessages::StopRequest => break,
-                },
-                Err(e) => tx.send(Err(Box::new(e))).unwrap(),
+                    queue_len.fetch_sub(1, Ordering::Relaxed);
+                }
+                SlaveMessage::StopRequest => break,
             }
         }
     }

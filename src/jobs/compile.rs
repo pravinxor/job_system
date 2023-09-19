@@ -5,6 +5,7 @@ use std::{
 
 use crate::job::{Job, JobData};
 
+#[derive(Debug)]
 struct CompileJob {
     data: JobData,
     /// The output buffer containing the data from the process spawned within execute()

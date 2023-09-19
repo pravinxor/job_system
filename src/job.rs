@@ -5,6 +5,7 @@ use std::{
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Debug)]
 pub struct JobData {
     pub id: usize,
     pub r#type: usize,

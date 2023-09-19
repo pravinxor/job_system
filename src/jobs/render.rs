@@ -1,7 +1,8 @@
-use std::error::Error;
+use std::{error::Error, thread, time::Duration};
 
 use crate::job::{Job, JobData};
 
+#[derive(Debug)]
 pub struct RenderJob {
     data: JobData,
     /// The rendering data to be processed by execute()
@@ -27,7 +28,6 @@ impl Job for RenderJob {
         if let Some(first_data_idx) = self.render_data.first_mut() {
             *first_data_idx = total;
         }
-
         eprintln!("Job {} has been executed", self.data.id);
         Ok(())
     }

@@ -19,10 +19,13 @@ pub struct JobSlave {
     handle: Option<thread::JoinHandle<()>>,
 
     /// Channel to send instructions to slave thread
-    tx: Sender<SlaveMessage>,
+    pub tx: Sender<SlaveMessage>,
 
     /// A bitmask of the channels of jobs that may be performed by the thread
     channels: u64,
+
+    /// The unique name associated with the slave thread
+    pub name: String,
 
     /// The number of jobs queued for completion
     queue_len: Arc<AtomicUsize>,
@@ -30,7 +33,7 @@ pub struct JobSlave {
 
 impl JobSlave {
     pub fn new(
-        unique_name: String,
+        name: String,
         channels: u64,
         tx_thread: Sender<MasterMessage>,
     ) -> Result<Self, std::io::Error> {
@@ -38,19 +41,16 @@ impl JobSlave {
         let queue_len = Arc::new(AtomicUsize::new(0));
         let ql_slave = queue_len.clone();
 
-        let handle = thread::Builder::new()
-            .name(unique_name)
-            .spawn(move || JobSlave::work(rx_thread, tx_thread, ql_slave))?;
+        let handle =
+            thread::Builder::new().spawn(move || JobSlave::work(rx_thread, tx_thread, ql_slave))?;
 
         Ok(Self {
             handle: Some(handle),
             tx: tx_system,
             channels,
+            name,
             queue_len,
         })
-    }
-    pub fn name(&self) -> Option<&str> {
-        self.handle.as_ref()?.thread().name()
     }
 
     pub fn submit(&self, message: SlaveMessage) -> Result<(), SendError<SlaveMessage>> {
@@ -69,8 +69,11 @@ impl JobSlave {
         while let Ok(message) = rx.recv() {
             match message {
                 SlaveMessage::Job(mut job) => {
-                    if let Err(e) = job.execute() {
-                        tx.send(MasterMessage::RecvCompletedJob(Err(e))).unwrap();
+                    if let Err(e) = tx.send(MasterMessage::RecvCompletedJob(match job.execute() {
+                        Ok(_) => Ok(job),
+                        Err(e) => Err(e),
+                    })) {
+                        eprintln!("Failed to send completed job to Master: {}", e)
                     }
                     queue_len.fetch_sub(1, Ordering::Relaxed);
                 }
@@ -83,7 +86,12 @@ impl JobSlave {
 impl Drop for JobSlave {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.join().unwrap();
+            if let Err(e) = self.tx.send(SlaveMessage::StopRequest) {
+                eprintln!("Couldn't send stop request to slave thread: {}", e)
+            }
+            if let Err(e) = handle.join() {
+                eprintln!("Couldn't join the master thread: {:?}", e)
+            }
         }
     }
 }

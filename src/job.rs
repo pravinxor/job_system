@@ -31,4 +31,6 @@ pub trait Job: Send + Sync {
     fn complete_callback(&mut self) -> Result<(), Box<dyn Error + Send + Sync>>;
     /// Returns an id that should be unique and specific to the current job
     fn get_unique_id(&self) -> usize;
+    /// Returns the type of current job (from JobData)
+    fn get_type(&self) -> usize;
 }

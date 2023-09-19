@@ -1,2 +1,2 @@
-mod compile;
-mod render;
+pub mod compile;
+pub mod render;

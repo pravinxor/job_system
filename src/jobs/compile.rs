@@ -36,4 +36,8 @@ impl Job for CompileJob {
     fn get_unique_id(&self) -> usize {
         self.data.id
     }
+
+    fn get_type(&self) -> usize {
+        self.data.r#type
+    }
 }

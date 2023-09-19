@@ -2,10 +2,19 @@ use std::error::Error;
 
 use crate::job::{Job, JobData};
 
-struct RenderJob {
+pub struct RenderJob {
     data: JobData,
     /// The rendering data to be processed by execute()
     render_data: Vec<i64>,
+}
+
+impl RenderJob {
+    pub fn new(r#type: usize, channels: usize, render_data: Vec<i64>) -> Self {
+        Self {
+            data: JobData::new(r#type, channels),
+            render_data,
+        }
+    }
 }
 
 impl Job for RenderJob {
@@ -32,5 +41,9 @@ impl Job for RenderJob {
 
     fn get_unique_id(&self) -> usize {
         self.data.id
+    }
+
+    fn get_type(&self) -> usize {
+        self.data.r#type
     }
 }

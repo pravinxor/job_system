@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Condvar, Mutex},
 };
 
-struct MessageQueue<T> {
+pub(crate) struct MessageQueue<T> {
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
 }
@@ -22,7 +22,7 @@ impl<T> MessageQueue<T> {
     }
 
     /// Pops element from queue. If multiple threads are waiting on pop(), the thread chosen is nondeterministic
-    fn pop(&self) -> T {
+    pub(crate) fn pop(&self) -> T {
         let mut queue = self.queue.lock().unwrap();
         // The purpose of the loop is to handle cases of spurious unlocks, where the `available` was notified spuriously
         loop {

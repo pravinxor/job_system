@@ -32,3 +32,11 @@ impl<T: Serialize + Send + Sync + 'static> JobSystem<T> {
         handle
     }
 }
+
+impl<T: Serialize + Send + Sync> Drop for JobSystem<T> {
+    fn drop(&mut self) {
+        for _ in 0..self.workers.len() {
+            self.message_queue.send(WorkerMessage::Join)
+        }
+    }
+}

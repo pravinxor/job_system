@@ -30,6 +30,7 @@ impl Worker {
                 let y = func(x);
                 let mut guarded_result = handle.result.lock().unwrap();
                 *guarded_result = Some(y);
+                handle.available.notify_all();
             }
         }
     }

@@ -3,19 +3,19 @@ use std::{sync::Arc, thread};
 use super::{job_handle::HandleInner, message_queue::MessageQueue};
 use serde::Serialize;
 
-enum WorkerMessage<T: Serialize> {
+pub(crate) enum WorkerMessage<T: Serialize> {
     Handle(Arc<HandleInner<T>>),
 
     /// Notifies the thread to stop accepting jobs and exit its worker loop
     Join,
 }
 
-struct Worker {
+pub(crate) struct Worker {
     handle: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
-    fn new<T: Serialize + Send + Sync + 'static>(
+    pub(crate) fn new<T: Serialize + Send + Sync + 'static>(
         message_receiver: Arc<MessageQueue<WorkerMessage<T>>>,
     ) -> Self {
         Self {
@@ -24,8 +24,14 @@ impl Worker {
     }
 
     fn worker_loop<T: Serialize>(message_receiver: Arc<MessageQueue<WorkerMessage<T>>>) {
-        while let WorkerMessage::Handle(handle) = message_receiver.pop() {}
-        todo!()
+        while let WorkerMessage::Handle(handle) = message_receiver.recv() {
+            if let Some(x) = handle.x.lock().unwrap().take() {
+                let func = handle.f;
+                let y = func(x);
+                let mut guarded_result = handle.result.lock().unwrap();
+                *guarded_result = Some(y);
+            }
+        }
     }
 }
 

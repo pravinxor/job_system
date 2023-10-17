@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 pub(crate) fn output(input: Value) -> Value {
     if let Some(target) = input["target"].as_str() {
         match Command::new("make").arg(target).output() {
-            Ok(c) => json!({"output" : String::from_utf8_lossy(&c.stderr)}),
+            Ok(c) => json!({"clang_output" : String::from_utf8_lossy(&c.stderr)}),
             Err(e) => {
                 json!({"error" : e.to_string()})
             }

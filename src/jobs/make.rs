@@ -1,4 +1,4 @@
-use std::{error::Error, process::Command};
+use std::process::Command;
 
 use serde_json::{json, Value};
 

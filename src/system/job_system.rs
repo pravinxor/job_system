@@ -48,7 +48,7 @@ pub mod ffi {
     use std::{
         ffi::{c_char, CStr, CString},
         str::FromStr,
-        sync::{atomic::AtomicUsize, Mutex},
+        sync::{atomic::AtomicU64, Mutex},
     };
 
     use crate::system::job_handle::JobHandle;
@@ -56,9 +56,36 @@ pub mod ffi {
     use super::JobSystem;
 
     lazy_static! {
-        static ref JOB_MAP: DashMap<usize, JobHandle<Value>> = DashMap::new();
-        static ref JOB_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+        static ref JOB_MAP: DashMap<u64, JobHandle<Value>> = DashMap::new();
+        static ref JOB_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
         static ref SYSTEM: Mutex<JobSystem<Value>> = Mutex::new(JobSystem::new());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_job(json_str_ptr: *const c_char) -> *const c_char {
+        assert!(!json_str_ptr.is_null());
+        let input_str = unsafe { CStr::from_ptr(json_str_ptr).to_str().unwrap() };
+
+        let output_json;
+        if let Ok(job_json) = Value::from_str(input_str) {
+            if let Some(handle_id) = job_json["handle_id"].as_u64() {
+                if let Some(handle) = JOB_MAP.remove(&handle_id).and_then(|e| Some(e.1)) {
+                    let result = handle.get();
+                    output_json = json!({"success" : true, "result" : result});
+                } else {
+                    output_json =
+                        json!({"success" : false, "error" : "specified handle id was not found"});
+                }
+            } else {
+                output_json = json!({"success": false,"error" : "'type' handle_id is not an int or may not exist"});
+            }
+        } else {
+            output_json = json!({"success" : false, "error" : "unable to parse input, job_json"})
+        }
+
+        let c_str = CString::new(output_json.to_string()).unwrap();
+
+        c_str.into_raw()
     }
 
     #[no_mangle]

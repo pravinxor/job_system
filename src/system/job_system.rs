@@ -72,7 +72,12 @@ pub mod ffi {
             _ => None,
         }
     }
-
+    macro_rules! into_raw_cstr {
+        ($json_val:expr) => {{
+            let c_str = CString::new($json_val.to_string()).unwrap();
+            c_str.into_raw()
+        }};
+    }
     macro_rules! parse_json_from_str {
         ($input_str:expr) => {{
             Value::from_str($input_str).map_err(|_| "Unable to parse json")
@@ -104,6 +109,31 @@ pub mod ffi {
     }
 
     #[no_mangle]
+    pub extern "C" fn add_worker(json_str_ptr: *const c_char) -> *const c_char {
+        let output_json = if json_str_ptr.is_null() {
+            json!({"error" : "json_str_ptr was a null pointer"})
+        } else {
+            let input_str = unsafe { CStr::from_ptr(json_str_ptr).to_str().unwrap() };
+
+            match query_system_add_worker(input_str) {
+                Ok(()) => json!({"success" : true}),
+                Err(message) => json!({"success" : false, "error" : message}),
+            }
+        };
+        into_raw_cstr!(output_json)
+    }
+
+    fn query_system_add_worker(input_str: &str) -> Result<(), String> {
+        let job_json = parse_json_from_str!(input_str)?;
+
+        let system = fetch_system_from_json!(job_json)?;
+        let mut system = system.lock().unwrap();
+
+        system.add_worker();
+        Ok(())
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_job(json_str_ptr: *const c_char) -> *const c_char {
         assert!(!json_str_ptr.is_null());
         let output_json = if json_str_ptr.is_null() {
@@ -116,9 +146,7 @@ pub mod ffi {
                 Err(message) => json!({"success" : false, "error" : message}),
             }
         };
-        let c_str = CString::new(output_json.to_string()).unwrap();
-
-        c_str.into_raw()
+        into_raw_cstr!(output_json)
     }
 
     fn process_and_query_job(input_str: &str) -> Result<Value, String> {
@@ -150,7 +178,7 @@ pub mod ffi {
             }
         };
 
-        CString::new(output_json.to_string()).unwrap().into_raw()
+        into_raw_cstr!(output_json)
     }
 
     fn process_and_load_job(input_str: &str) -> Result<u64, String> {
@@ -175,5 +203,10 @@ pub mod ffi {
         Ok(id)
     }
 
-    pub extern "C" fn free_str() {}
+    #[no_mangle]
+    pub extern "C" fn free_str(ptr: *mut c_char) {
+        unsafe {
+            drop(CString::from_raw(ptr));
+        }
+    }
 }

@@ -45,6 +45,7 @@ pub mod ffi {
     use dashmap::DashMap;
     use lazy_static::lazy_static;
     use serde_json::{json, Value};
+    use std::sync::atomic::Ordering::Relaxed;
     use std::{
         ffi::{c_char, CStr, CString},
         str::FromStr,
@@ -57,8 +58,19 @@ pub mod ffi {
 
     lazy_static! {
         static ref JOB_MAP: DashMap<u64, JobHandle<Value>> = DashMap::new();
-        static ref JOB_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
-        static ref SYSTEM: Mutex<JobSystem<Value>> = Mutex::new(JobSystem::new());
+        static ref ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+        static ref SYSTEM_MAP: DashMap<u64, Mutex<JobSystem<Value>>> = DashMap::new();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn create_jobsystem(json_str_ptr: *const c_char) -> *const c_char {
+        let system = Mutex::new(JobSystem::new());
+        let id = ID_COUNTER.fetch_add(1, Relaxed);
+        SYSTEM_MAP.insert(id, system);
+        let output_json = json!({"success" : true, "system_id" : id});
+
+        let c_str = CString::new(output_json.to_string()).unwrap();
+        return c_str.into_raw();
     }
 
     #[no_mangle]
@@ -104,7 +116,7 @@ pub mod ffi {
                     _ => None,
                 };
                 if let Some(job_fn) = job {
-                    let id = JOB_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let id = ID_COUNTER.fetch_add(1, Relaxed);
                     let input = job_json["input"].clone();
                     let mut system = SYSTEM.lock().unwrap();
                     let handle = system.send_job(input, job_fn);

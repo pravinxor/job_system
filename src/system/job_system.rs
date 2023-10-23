@@ -78,6 +78,15 @@ pub mod ffi {
             c_str.into_raw()
         }};
     }
+    // macro_rules! from_raw_cstr {
+    //     ($raw_cstr:expr) => {{
+    //         !raw_cstr.is_null() {
+    //             unsafe { Ok(CStr::from_ptr(json_str_ptr).to_str().unwrap()) }
+    //         } else {
+    //             Err
+    //         }
+    //     }}
+    // }
     macro_rules! parse_json_from_str {
         ($input_str:expr) => {{
             Value::from_str($input_str).map_err(|_| "Unable to parse json")

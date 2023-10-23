@@ -1,10 +1,18 @@
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use serde::Serialize;
+
+#[derive(Clone)]
+pub enum Status {
+    Queued,
+    Running,
+    Completed,
+}
 
 pub(crate) struct HandleInner<T: Serialize> {
     pub(crate) x: Mutex<Option<T>>,
     pub(crate) f: fn(T) -> T,
+    pub(crate) status: Mutex<Status>,
     pub(crate) result: Mutex<Option<T>>,
     pub(crate) available: Condvar,
 }
@@ -21,6 +29,7 @@ impl<T: Serialize> JobHandle<T> {
             f,
             result: Mutex::new(None),
             available: Condvar::new(),
+            status: Mutex::new(Status::Queued),
         };
         Self {
             handle_inner: Arc::new(handle_inner),
@@ -37,5 +46,9 @@ impl<T: Serialize> JobHandle<T> {
                 data_guard = self.handle_inner.available.wait(data_guard).unwrap();
             }
         }
+    }
+
+    pub fn get_status(&self) -> Status {
+        self.handle_inner.status.lock().unwrap().clone()
     }
 }

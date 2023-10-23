@@ -52,7 +52,7 @@ pub mod ffi {
         sync::{atomic::AtomicU64, Mutex},
     };
 
-    use crate::system::job_handle::JobHandle;
+    use crate::system::job_handle::{JobHandle, Status};
 
     use super::JobSystem;
 
@@ -135,7 +135,6 @@ pub mod ffi {
 
     #[no_mangle]
     pub extern "C" fn get_job(json_str_ptr: *const c_char) -> *const c_char {
-        assert!(!json_str_ptr.is_null());
         let output_json = if json_str_ptr.is_null() {
             json!({"error" : "json_str_ptr was a null pointer"})
         } else {
@@ -162,6 +161,43 @@ pub mod ffi {
             .ok_or("specified handle id was not found")?;
 
         Ok(handle.get())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_job_status(json_str_ptr: *const c_char) -> *const c_char {
+        let output_json = if json_str_ptr.is_null() {
+            json!({"error" : "json_str_ptr was a null pointer"})
+        } else {
+            let input_str = unsafe { CStr::from_ptr(json_str_ptr).to_str().unwrap() };
+
+            match process_and_query_job_status(input_str) {
+                Ok(status) => json!({"success" : true, "status" : status}),
+                Err(message) => json!({"success" : false, "error" : message}),
+            }
+        };
+
+        into_raw_cstr!(output_json)
+    }
+
+    fn process_and_query_job_status(input_str: &str) -> Result<Value, String> {
+        let job_json = parse_json_from_str!(input_str)?;
+
+        let handle_id = job_json["handle_id"]
+            .as_u64()
+            .ok_or("'type' handle_id is not a valid number or may not exist")?;
+
+        let status = JOB_MAP
+            .get(&handle_id)
+            .map(|e| e.get_status())
+            .ok_or("specified handle id was not found")?;
+
+        let status_str = match status {
+            Status::Queued => "queued",
+            Status::Running => "running",
+            Status::Completed => "completed",
+        };
+
+        Ok(status_str.into())
     }
 
     #[no_mangle]

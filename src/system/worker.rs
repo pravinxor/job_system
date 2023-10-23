@@ -1,6 +1,9 @@
 use std::{sync::Arc, thread};
 
-use super::{job_handle::HandleInner, message_queue::MessageQueue};
+use super::{
+    job_handle::{HandleInner, Status},
+    message_queue::MessageQueue,
+};
 use serde::Serialize;
 
 pub(crate) enum WorkerMessage<T: Serialize> {
@@ -27,9 +30,11 @@ impl Worker {
         while let WorkerMessage::Handle(handle) = message_receiver.recv() {
             if let Some(x) = handle.x.lock().unwrap().take() {
                 let func = handle.f;
+                *handle.status.lock().unwrap() = Status::Running;
                 let y = func(x);
                 let mut guarded_result = handle.result.lock().unwrap();
                 *guarded_result = Some(y);
+                *handle.status.lock().unwrap() = Status::Completed;
                 handle.available.notify_all();
             }
         }

@@ -1,2 +1,3 @@
-pub mod compile;
-pub mod render;
+pub mod clangoutput;
+pub mod filereader;
+pub mod make;

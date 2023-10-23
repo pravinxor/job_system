@@ -1,40 +1,30 @@
+mod jobs;
+mod system;
+
+use jobs::filereader;
+use serde_json::json;
+
+use crate::{
+    jobs::{clangoutput, make},
+    system::job_system::JobSystem,
+};
 use std::error::Error;
 
-use job_system::JobSystem;
-use jobs::render::RenderJob;
-use rand::Rng;
-
-mod job;
-mod job_master;
-mod job_slave;
-mod job_system;
-mod jobs;
-
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut jobs = Vec::new();
-    dbg!("creating jobs");
-
-    for _ in 0..5 {
-        let render_data = (0..10000)
-            .map(|_| rand::thread_rng().gen_range(0..=10000))
-            .collect();
-        let job = Box::new(RenderJob::new(1, 0xFFFFFFFFFF, render_data));
-        jobs.push(job);
+    let mut system = JobSystem::new();
+    for _ in 0..num_cpus::get() {
+        system.add_worker();
     }
 
-    dbg!("creating system and slaves");
+    let handle = system.send_job(json!({"target": "demo"}), make::output);
+    let target_json = handle.get();
 
-    let mut system = JobSystem::new()?;
-    eprintln!("Created job system");
+    let handle = system.send_job(target_json, clangoutput::parse);
+    let output_json = handle.get();
 
-    for n in 0..16 {
-        system.create_slave(format!("thread{}", n), 0xFFFFFFFFFF)?;
-    }
+    let handle = system.send_job(output_json, filereader::read_context);
+    let context_output_json = handle.get();
 
-    dbg!("adding jobs to queue");
-    for job in jobs {
-        system.queue_job(job)?
-    }
-
+    println!("{}", context_output_json);
     Ok(())
 }

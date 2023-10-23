@@ -109,6 +109,32 @@ pub mod ffi {
     }
 
     #[no_mangle]
+    pub extern "C" fn destroy_jobsystem(json_str_ptr: *const c_char) -> *const c_char {
+        let output_json = if json_str_ptr.is_null() {
+            json!({"error" : "json_str_ptr was a null pointer"})
+        } else {
+            let input_str = unsafe { CStr::from_ptr(json_str_ptr).to_str().unwrap() };
+
+            match remove_system_from_map(input_str) {
+                Ok(()) => json!({"success" : true}),
+                Err(message) => json!({"success" : false, "error" : message}),
+            }
+        };
+        into_raw_cstr!(output_json)
+    }
+
+    fn remove_system_from_map(input_str: &str) -> Result<(), String> {
+        let system_json = parse_json_from_str!(input_str)?;
+        let system_id = system_json["system_id"]
+            .as_u64()
+            .ok_or("'system_id' key is not a valid number or may not exist")?;
+        SYSTEM_MAP
+            .remove(&system_id)
+            .ok_or("specified system id was not found")?;
+        Ok(())
+    }
+
+    #[no_mangle]
     pub extern "C" fn add_worker(json_str_ptr: *const c_char) -> *const c_char {
         let output_json = if json_str_ptr.is_null() {
             json!({"error" : "json_str_ptr was a null pointer"})

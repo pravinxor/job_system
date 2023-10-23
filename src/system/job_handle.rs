@@ -1,4 +1,4 @@
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex};
 
 use serde::Serialize;
 

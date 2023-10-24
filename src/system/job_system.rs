@@ -60,6 +60,23 @@ pub mod ffi {
         static ref ID_COUNTER: AtomicU64 = AtomicU64::new(0);
         static ref JOB_MAP: DashMap<u64, JobHandle<Value>> = DashMap::new();
         static ref SYSTEM_MAP: DashMap<u64, Mutex<JobSystem<Value>>> = DashMap::new();
+        static ref JOB_KV: DashMap<String, fn(Value) -> Value> = {
+            let mut map = DashMap::new();
+            map.insert(
+                String::from("make"),
+                crate::jobs::make::output as fn(Value) -> Value,
+            );
+            map.insert(
+                String::from("clang_parse"),
+                crate::jobs::clangoutput::parse as fn(Value) -> Value,
+            );
+
+            map.insert(
+                String::from("add_context"),
+                crate::jobs::filereader::read_context as fn(Value) -> Value,
+            );
+            map
+        };
     }
 
     type JobDef = fn(Value) -> Value;
@@ -263,6 +280,13 @@ pub mod ffi {
         JOB_MAP.insert(id, handle);
 
         Ok(id)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn list_job_types() -> *const c_char {
+        let entries: Vec<String> = JOB_KV.iter().map(|t| t.key().clone()).collect();
+        let json = json!({"entries" : entries});
+        into_raw_cstr!(json)
     }
 
     #[no_mangle]

@@ -12,8 +12,14 @@ use crate::{
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let tokens =
-        flowscript::tokenizer::Tokenizer::new(r#"public static void main {string "args"}"#);
+    let tokens = flowscript::tokenizer::Tokenizer::new(
+        r#"
+            digraph {
+                a->b;
+                b -> c;
+            }
+            "#,
+    );
 
     for token in tokens {
         dbg!(token);

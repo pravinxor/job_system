@@ -13,6 +13,7 @@ pub enum Token {
     Brace(BrState),
     Digraph,
     Text(String),
+    Semicolon,
 }
 
 pub struct Tokenizer<'a> {
@@ -53,6 +54,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 ']' => Some(Token::Bracket(BrState::Closed)),
                 '{' => Some(Token::Brace(BrState::Open)),
                 '}' => Some(Token::Brace(BrState::Closed)),
+                ';' => Some(Token::Semicolon),
                 '-' if self.chars.next_if_eq(&'>').is_some() => Some(Token::Arrow),
                 '"' => {
                     let t = Some(Token::Text(self.extract_string_until(|c| *c == '"')));

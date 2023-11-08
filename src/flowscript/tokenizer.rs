@@ -63,7 +63,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     let mut s = String::from(ch);
                     s += &self.extract_string_until(|c| !c.is_alphanumeric());
 
-                    Some(Token::Text(s))
+                    match &s {
+                        s if s.eq_ignore_ascii_case("digraph") => Some(Token::Digraph),
+                        _ => Some(Token::Text(s)),
+                    }
                 }
                 _ => None,
             }

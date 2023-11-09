@@ -19,6 +19,7 @@ pub enum Token {
     Arrow,
     Bracket(BrState),
     Brace(BrState),
+    Comma,
     Equals,
     Text(String),
     ReservedText(Key),
@@ -68,6 +69,7 @@ where
                 '}' => Some(Token::Brace(BrState::Closed)),
                 ';' => Some(Token::Semicolon),
                 '=' => Some(Token::Equals),
+                ',' => Some(Token::Comma),
                 '-' if self.chars.next_if_eq(&'>').is_some() => Some(Token::Arrow),
                 '"' => {
                     let t = Some(Token::Text(

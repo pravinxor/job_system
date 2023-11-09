@@ -25,19 +25,36 @@ pub enum Token {
     Semicolon,
 }
 
-pub struct Tokenizer<'a> {
-    chars: Peekable<Chars<'a>>,
+pub struct Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
+    chars: Peekable<I>,
 }
 
-impl<'a> Tokenizer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl<I> Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
+    fn new(inner: I) -> Self {
         Self {
-            chars: input.chars().peekable(),
+            chars: inner.peekable(),
         }
     }
 }
 
-impl<'a> Iterator for Tokenizer<'a> {
+// Extension trait for convenience
+pub trait TokenizerAdapter: Iterator<Item = char> + Sized {
+    fn tokens(self) -> Tokenizer<Self> {
+        Tokenizer::new(self)
+    }
+}
+impl<I: Iterator<Item = char>> TokenizerAdapter for I {}
+
+impl<I> Iterator for Tokenizer<I>
+where
+    I: Iterator<Item = char>,
+{
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
@@ -63,11 +80,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
                 ch if next_tok.is_alphanumeric() => {
                     let mut s = String::from(ch);
-                    s.push_str(
-                        &util::extract_until(&mut self.chars, |c| !c.is_ascii_alphanumeric())
-                            .iter()
-                            .collect::<String>(),
-                    );
+                    s += &util::extract_until(&mut self.chars, |c| !c.is_ascii_alphanumeric())
+                        .into_iter()
+                        .collect::<String>();
 
                     match &s {
                         s if s.eq_ignore_ascii_case("digraph") => {
@@ -76,7 +91,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                         s if s.eq_ignore_ascii_case("shape") => {
                             Some(Token::ReservedText(Key::Shape))
                         }
-
                         _ => Some(Token::Text(s)),
                     }
                 }

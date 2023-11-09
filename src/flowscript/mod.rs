@@ -1,2 +1,2 @@
-pub mod parser;
+pub mod execution_graph;
 pub mod tokenizer;

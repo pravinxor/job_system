@@ -1,5 +1,7 @@
 use std::{iter::Peekable, str::Chars};
 
+use super::util;
+
 #[derive(Debug, PartialEq)]
 pub enum BrState {
     Open,
@@ -7,12 +9,19 @@ pub enum BrState {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Key {
+    Digraph,
+    Shape,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Arrow,
     Bracket(BrState),
     Brace(BrState),
-    Digraph,
+    Equals,
     Text(String),
+    ReservedText(Key),
     Semicolon,
 }
 
@@ -26,27 +35,13 @@ impl<'a> Tokenizer<'a> {
             chars: input.chars().peekable(),
         }
     }
-
-    fn extract_string_until<P>(&mut self, predicate: P) -> String
-    where
-        P: Fn(&char) -> bool,
-    {
-        let mut s = String::new();
-        while let Some(ch) = self.chars.peek() {
-            if predicate(ch) {
-                break;
-            }
-            s.push(self.chars.next().unwrap());
-        }
-        s
-    }
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
-        self.extract_string_until(|c| !c.is_whitespace());
+        util::extract_until(&mut self.chars, |c| !c.is_whitespace());
 
         if let Some(next_tok) = self.chars.next() {
             match next_tok {
@@ -55,18 +50,33 @@ impl<'a> Iterator for Tokenizer<'a> {
                 '{' => Some(Token::Brace(BrState::Open)),
                 '}' => Some(Token::Brace(BrState::Closed)),
                 ';' => Some(Token::Semicolon),
+                '=' => Some(Token::Equals),
                 '-' if self.chars.next_if_eq(&'>').is_some() => Some(Token::Arrow),
                 '"' => {
-                    let t = Some(Token::Text(self.extract_string_until(|c| *c == '"')));
+                    let t = Some(Token::Text(
+                        util::extract_until(&mut self.chars, |c| *c == '"')
+                            .iter()
+                            .collect(),
+                    ));
                     self.chars.next(); // extract the last '"'
                     t
                 }
                 ch if next_tok.is_alphanumeric() => {
                     let mut s = String::from(ch);
-                    s += &self.extract_string_until(|c| !c.is_alphanumeric());
+                    s.push_str(
+                        &util::extract_until(&mut self.chars, |c| !c.is_ascii_alphanumeric())
+                            .iter()
+                            .collect::<String>(),
+                    );
 
                     match &s {
-                        s if s.eq_ignore_ascii_case("digraph") => Some(Token::Digraph),
+                        s if s.eq_ignore_ascii_case("digraph") => {
+                            Some(Token::ReservedText(Key::Digraph))
+                        }
+                        s if s.eq_ignore_ascii_case("shape") => {
+                            Some(Token::ReservedText(Key::Shape))
+                        }
+
                         _ => Some(Token::Text(s)),
                     }
                 }

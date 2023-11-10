@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars};
+use std::iter::Peekable;
 
 use super::util;
 
@@ -37,9 +37,9 @@ impl<I> Tokenizer<I>
 where
     I: Iterator<Item = char>,
 {
-    fn new(inner: I) -> Self {
+    fn new(chars: I) -> Self {
         Self {
-            chars: inner.peekable(),
+            chars: chars.peekable(),
         }
     }
 }

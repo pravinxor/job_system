@@ -12,6 +12,7 @@ pub enum BrState {
 pub enum Key {
     Digraph,
     Shape,
+    Data,
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,6 +94,7 @@ where
                         s if s.eq_ignore_ascii_case("shape") => {
                             Some(Token::ReservedText(Key::Shape))
                         }
+                        s if s.eq_ignore_ascii_case("data") => Some(Token::ReservedText(Key::Data)),
                         _ => Some(Token::Text(s)),
                     }
                 }

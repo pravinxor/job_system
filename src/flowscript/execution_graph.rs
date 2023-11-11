@@ -37,18 +37,19 @@ impl ExecutionGraph {
         let node_index = self.get_or_create_node(node_name);
 
         let mut attributes = HashMap::new();
-        let mut i = 0;
-        while i < attrs_tokens.len() {
-            match (
-                attrs_tokens.get(i).take(),
-                attrs_tokens.get(i + 1),
-                attrs_tokens.get(i + 2).take(),
-            ) {
-                (Some(Token::ReservedText(key)), Some(Token::Equals), Some(Token::Text(value))) => {
-                    attributes.insert(*key, value.to_owned());
-                    i += 3;
+        let mut iter = attrs_tokens.iter().peekable();
+
+        while let Some(token) = iter.next() {
+            if let Token::ReservedText(key) = token {
+                if iter.next() == Some(&Token::Equals) {
+                    if let Some(Token::Text(value)) = iter.next() {
+                        attributes.insert(key.clone(), value.clone());
+                    } else {
+                        return Err(format!("Expected text after '=' in {:?}", attrs_tokens));
+                    }
+                } else {
+                    return Err(format!("Expected '=' after key in {:?}", attrs_tokens));
                 }
-                _ => return Err(format!("Invalid attribute format in {:?}", attrs_tokens)),
             }
         }
 
@@ -60,10 +61,6 @@ impl ExecutionGraph {
     }
 
     fn parse_line(&mut self, tokens: Vec<Token>) -> Result<(), String> {
-        if tokens.is_empty() {
-            return Ok(());
-        }
-
         match tokens.as_slice() {
             [Token::Text(node_name), Token::Bracket(BrState::Open), ..] => {
                 // Handling node attributes

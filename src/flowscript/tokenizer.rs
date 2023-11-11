@@ -8,7 +8,7 @@ pub enum BrState {
     Closed,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Key {
     Digraph,
     Shape,

@@ -90,10 +90,7 @@ pub mod ffi {
     }
 
     pub fn map_job_identifier(identifier: &str) -> Option<JobDef> {
-        match JOB_KV.get(identifier) {
-            Some(j) => Some(j.to_owned() as JobDef),
-            None => None,
-        }
+        JOB_KV.get(identifier).map(|j| j.to_owned() as JobDef)
     }
     macro_rules! into_raw_cstr {
         ($json_val:expr) => {{

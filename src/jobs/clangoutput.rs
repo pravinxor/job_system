@@ -12,15 +12,16 @@ lazy_static! {
     .unwrap();
 }
 
-pub fn parse(input: Value) -> Value {
+pub fn parse(x: Value) -> Value {
+    let input = &x["input"];
     if let Some(clang_output) = input["clang_output"].as_str() {
-        let mut output = json!({"files" : [], "linker": {"message" : "", "symbols": []}});
+        let mut output = json!({"files": [], "linker": {"message" : "", "symbols": []}});
         for line in clang_output.lines() {
             if let Some(caps) = COMPILER_EXPR.captures(line) {
                 let filename = &caps["filename"];
                 let error_entry = json!({
-                    "line": &caps["line"],
-                    "column": &caps["column"],
+                    "line": &caps["line"].parse::<u64>().unwrap_or_default(),
+                    "column": &caps["column"].parse::<u64>().unwrap_or_default(),
                     "message": &caps["message"]
                 });
 
@@ -49,13 +50,13 @@ pub fn parse(input: Value) -> Value {
                 output["linker"]["symbols"]
                     .as_array_mut()
                     .unwrap()
-                    .push(json!({ "message" : line }));
+                    .push(json!({"message": line }));
             } else {
                 continue;
             }
         }
-        output
+        json!({"result": output, "status": 0})
     } else {
-        json!({"error": "no 'clang_output' key found in input"})
+        json!({"result": {"message": {"error": "no 'clang_output' key found in input"}}, "status": 1})
     }
 }

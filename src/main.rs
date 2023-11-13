@@ -24,8 +24,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let tokens = input.into_bytes().into_iter().map(|b| b as char).tokens();
 
-    let graph = ExecutionGraph::from_tokens(&mut tokens.peekable())?;
+    let tokens: Vec<_> = tokens.collect();
+    let mut tokens = tokens.into_iter().peekable();
 
-    dbg!(graph);
+    let mut graph = ExecutionGraph::from_tokens(&mut tokens)?;
+
+    let res = graph.execute_all();
     Ok(())
 }

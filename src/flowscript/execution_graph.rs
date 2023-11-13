@@ -5,7 +5,13 @@ use petgraph::{
     Direction,
 };
 use serde_json::{json, Value};
-use std::{collections::HashMap, error::Error, iter::Peekable, sync::Arc};
+use std::{
+    collections::HashMap,
+    error::Error,
+    iter::{Peekable, Sum},
+    ops::Add,
+    sync::Arc,
+};
 
 use crate::system::job_system::JobSystem;
 
@@ -72,6 +78,56 @@ pub(crate) struct ExecutionGraph {
     edge_counter: usize,
 }
 
+impl Add for ExecutionGraph {
+    type Output = Self;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        if self.name != other.name {
+            self.name = None;
+        }
+
+        // Collect and sort edges from the other graph
+        let mut edges: Vec<_> = other.graph.raw_edges().iter().collect();
+        edges.sort_by_key(|edge| edge.weight);
+
+        // Merge the graphs, nodes, and sorted edges
+        for (name, index) in other.node_indices {
+            let new_index = self.get_or_create_node(&name);
+            // Assuming ProcessNode can be cloned or adjusted accordingly
+            self.graph[new_index] = other.graph[index].clone();
+
+            // Add sorted edges
+            for edge in edges.iter() {
+                if edge.source() == index {
+                    let target = edge.target();
+                    let new_target_index = self.get_or_create_node(&other.graph[target].name);
+                    if self.graph.find_edge(new_index, new_target_index).is_none() {
+                        self.graph
+                            .add_edge(new_index, new_target_index, self.edge_counter);
+                        self.edge_counter += 1;
+                    }
+                }
+            }
+        }
+        self
+    }
+}
+
+impl Sum for ExecutionGraph {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        iter.fold(Self::default(), |a, b| a + b)
+    }
+}
+
+impl Default for ExecutionGraph {
+    fn default() -> Self {
+        Self::new(None, num_cpus::get())
+    }
+}
+
 impl ExecutionGraph {
     pub fn new(name: Option<String>, n_threads: usize) -> Self {
         let mut system = JobSystem::new();
@@ -122,7 +178,7 @@ impl ExecutionGraph {
         &mut self,
         node_name: &str,
         attrs_tokens: &[Token],
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let node_index = self.get_or_create_node(node_name);
 
         let mut attributes = HashMap::new();
@@ -150,7 +206,7 @@ impl ExecutionGraph {
         Ok(())
     }
 
-    fn parse_line(&mut self, tokens: Vec<Token>) -> Result<(), Box<dyn Error>> {
+    fn parse_line(&mut self, tokens: Vec<Token>) -> Result<(), Box<dyn Error + Send + Sync>> {
         match tokens.as_slice() {
             [Token::Text(node_name), Token::Bracket(BrState::Open), ..] => {
                 // Handling node attributes
@@ -166,7 +222,7 @@ impl ExecutionGraph {
         }
     }
 
-    pub fn from_tokens<I>(tokens: &mut Peekable<I>) -> Result<Self, Box<dyn Error>>
+    pub fn from_tokens<I>(tokens: &mut Peekable<I>) -> Result<Self, Box<dyn Error + Send + Sync>>
     where
         I: Iterator<Item = Token>,
     {

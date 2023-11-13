@@ -53,6 +53,28 @@ pub trait TokenizerAdapter: Iterator<Item = char> + Sized {
 }
 impl<I: Iterator<Item = char>> TokenizerAdapter for I {}
 
+fn extract_str_until<I, P>(iter: &mut Peekable<I>, predicate: P) -> String
+where
+    I: Iterator<Item = char>,
+    P: Fn(&char) -> bool,
+{
+    let mut s = String::new();
+    let mut is_escaped = false;
+    while iter
+        .peek()
+        .filter(|e| is_escaped || !predicate(e))
+        .is_some()
+    {
+        let c = iter.next().unwrap();
+        is_escaped = c == '\\';
+
+        if !is_escaped {
+            s.push(c)
+        }
+    }
+    s
+}
+
 impl<I> Iterator for Tokenizer<I>
 where
     I: Iterator<Item = char>,
@@ -73,19 +95,17 @@ where
                 ',' => Some(Token::Comma),
                 '-' if self.chars.next_if_eq(&'>').is_some() => Some(Token::Arrow),
                 '"' => {
-                    let t = Some(Token::Text(
-                        util::extract_until(&mut self.chars, |c| *c == '"')
-                            .iter()
-                            .collect(),
-                    ));
+                    let t = Some(Token::Text(extract_str_until(&mut self.chars, |c| {
+                        *c == '"'
+                    })));
                     self.chars.next(); // extract the last '"'
                     t
                 }
                 ch if next_tok.is_alphanumeric() => {
                     let mut s = String::from(ch);
-                    s += &util::extract_until(&mut self.chars, |c| !c.is_ascii_alphanumeric())
-                        .into_iter()
-                        .collect::<String>();
+                    s += &extract_str_until(&mut self.chars, |c| {
+                        !c.is_ascii_alphanumeric() && *c != '_'
+                    });
 
                     match &s {
                         s if s.eq_ignore_ascii_case("digraph") => {

@@ -22,7 +22,7 @@ fn replace_entries(filename: &str, error_array: &mut Vec<Value>) -> Result<(), V
                 let context = get_context(&mut reader, 0.min(line - 2), 5);
                 error["context"] = Value::String(context);
             } else {
-                return Err(json!({ "error" : "line must exist and be an Integer type" }));
+                return Err(json!({"error" : "line must exist and be an Integer type" }));
             }
         }
     }
@@ -30,14 +30,14 @@ fn replace_entries(filename: &str, error_array: &mut Vec<Value>) -> Result<(), V
 }
 
 /// Adds context to the file error, but including the line of the error as well as 2 lines below and above
-pub fn read_context(input: Value) -> Value {
-    let mut output = input;
+pub fn read_context(x: Value) -> Value {
+    let mut output = x["input"].to_owned();
     if let Some(files) = output["files"].as_array_mut() {
         for file in files {
             let filename = match file["filename"].as_str() {
                 Some(filename) => filename.to_string(),
                 None => {
-                    return json!({"error" : "files[]->filename is not a String or may not exist"})
+                    return json!({"result": {"error" : "files[]->filename is not a String or may not exist"}, "status": 1})
                 }
             };
             if let Some(error_array) = file["errors"].as_array_mut() {
@@ -45,11 +45,11 @@ pub fn read_context(input: Value) -> Value {
                     return e;
                 }
             } else {
-                return json!({"error" : "files[]->errors[] is not an array or may not exist or files[]->filename is not a string or may not exist"});
+                return json!({"result": {"message" : "files[]->errors[] is not an array or may not exist or files[]->filename is not a string or may not exist"}, "status": 1});
             }
         }
     } else {
-        return json!({"error" : "files[] is not an array or may not exist"});
+        return json!({"result": {"message" : "files[] is not an array or may not exist"}, "status": 1});
     }
-    output
+    json!({"result": output, "status": 0})
 }

@@ -1,30 +1,34 @@
+mod flowscript;
 mod jobs;
 mod system;
 
+use flowscript::tokenizer::Token;
 use jobs::filereader;
 use serde_json::json;
 
 use crate::{
+    flowscript::execution_graph::ExecutionGraph,
+    flowscript::tokenizer::TokenizerAdapter,
+    flowscript::util::SpliteratorAdapter,
     jobs::{clangoutput, make},
     system::job_system::JobSystem,
 };
-use std::error::Error;
+use std::{
+    error::Error,
+    io::{self, Read},
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut system = JobSystem::new();
-    for _ in 0..num_cpus::get() {
-        system.add_worker();
-    }
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
 
-    let handle = system.send_job(json!({"target": "demo"}), make::output);
-    let target_json = handle.get();
+    let tokens = input.into_bytes().into_iter().map(|b| b as char).tokens();
 
-    let handle = system.send_job(target_json, clangoutput::parse);
-    let output_json = handle.get();
+    let tokens: Vec<_> = tokens.collect();
+    let mut tokens = tokens.into_iter().peekable();
 
-    let handle = system.send_job(output_json, filereader::read_context);
-    let context_output_json = handle.get();
+    let mut graph = ExecutionGraph::from_tokens(&mut tokens)?;
 
-    println!("{}", context_output_json);
+    let res = graph.execute_all();
     Ok(())
 }

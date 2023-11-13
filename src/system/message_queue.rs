@@ -3,12 +3,16 @@ use std::{
     sync::{Arc, Condvar, Mutex},
 };
 
-pub(crate) struct MessageQueue<T> {
+#[derive(Debug)]
+pub(crate) struct MessageQueue<T>
+where
+    T: Send + Sync,
+{
     queue: Mutex<VecDeque<T>>,
     available: Condvar,
 }
 
-impl<T> MessageQueue<T> {
+impl<T: Send + Sync> MessageQueue<T> {
     pub(crate) fn new() -> Arc<Self> {
         Arc::new(Self {
             queue: Mutex::new(VecDeque::new()),

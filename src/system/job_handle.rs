@@ -1,29 +1,28 @@
 use std::sync::{Arc, Condvar, Mutex};
 
-use serde::Serialize;
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Status {
     Queued,
     Running,
     Completed,
 }
-
-pub(crate) struct HandleInner<T: Serialize> {
-    pub(crate) x: Mutex<Option<T>>,
-    pub(crate) f: fn(T) -> T,
+#[derive(Debug)]
+pub(crate) struct HandleInner<X, Y> {
+    pub(crate) x: Mutex<Option<X>>,
+    pub(crate) f: fn(X) -> Y,
     pub(crate) status: Mutex<Status>,
-    pub(crate) result: Mutex<Option<T>>,
+    pub(crate) result: Mutex<Option<Y>>,
     pub(crate) available: Condvar,
 }
 
 /// A handle that is returned after the system takes a job
-pub struct JobHandle<T: Serialize> {
-    pub(crate) handle_inner: Arc<HandleInner<T>>,
+#[derive(Debug)]
+pub struct JobHandle<X, Y> {
+    pub(crate) handle_inner: Arc<HandleInner<X, Y>>,
 }
 
-impl<T: Serialize> JobHandle<T> {
-    pub(crate) fn new(x: T, f: fn(T) -> T) -> Self {
+impl<X, Y> JobHandle<X, Y> {
+    pub(crate) fn new(x: X, f: fn(X) -> Y) -> Self {
         let handle_inner = HandleInner {
             x: Mutex::new(Some(x)),
             f,
@@ -36,7 +35,7 @@ impl<T: Serialize> JobHandle<T> {
         }
     }
     /// Consumes the JobHandle and blocks the current thread until the result is available
-    pub fn get(self) -> T {
+    pub fn get(self) -> Y {
         let mut data_guard = self.handle_inner.result.lock().unwrap();
         // Similar to the message_queue, loop until the data is Some, because the condition variable may spuriously wake up
         loop {

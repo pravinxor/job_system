@@ -1,19 +1,22 @@
 use std::sync::Arc;
 
-use serde::Serialize;
-
 use super::{
     job_handle::JobHandle,
     message_queue::MessageQueue,
     worker::{Worker, WorkerMessage},
 };
 
-pub(crate) struct JobSystem<T: Serialize + Send + Sync + 'static> {
+#[derive(Debug)]
+pub(crate) struct JobSystem<X, Y>
+where
+    X: Send + Sync,
+    Y: Send + Sync,
+{
     workers: Vec<Worker>,
-    message_queue: Arc<MessageQueue<WorkerMessage<T>>>,
+    message_queue: Arc<MessageQueue<WorkerMessage<X, Y>>>,
 }
 
-impl<T: Serialize + Send + Sync + 'static> JobSystem<T> {
+impl<X: Send + Sync, Y: Send + Sync> JobSystem<X, Y> {
     pub(crate) fn new() -> Self {
         Self {
             message_queue: MessageQueue::new(),
@@ -21,11 +24,7 @@ impl<T: Serialize + Send + Sync + 'static> JobSystem<T> {
         }
     }
 
-    pub(crate) fn add_worker(&mut self) {
-        self.workers.push(Worker::new(self.message_queue.clone()));
-    }
-
-    pub(crate) fn send_job(&mut self, x: T, f: fn(T) -> T) -> JobHandle<T> {
+    pub(crate) fn send_job(&mut self, x: X, f: fn(X) -> Y) -> JobHandle<X, Y> {
         let handle = JobHandle::new(x, f);
         self.message_queue
             .send(WorkerMessage::Handle(handle.handle_inner.clone()));
@@ -33,7 +32,13 @@ impl<T: Serialize + Send + Sync + 'static> JobSystem<T> {
     }
 }
 
-impl<T: Serialize + Send + Sync> Drop for JobSystem<T> {
+impl<X: Send + Sync + 'static, Y: Send + Sync + 'static> JobSystem<X, Y> {
+    pub(crate) fn add_worker(&mut self) {
+        self.workers.push(Worker::new(self.message_queue.clone()));
+    }
+}
+
+impl<X: Send + Sync, Y: Send + Sync> Drop for JobSystem<X, Y> {
     fn drop(&mut self) {
         for _ in 0..self.workers.len() {
             self.message_queue.send(WorkerMessage::Join)
@@ -56,37 +61,38 @@ pub mod ffi {
 
     use super::JobSystem;
 
+    type JobDef = fn(Value) -> Value;
     lazy_static! {
         static ref ID_COUNTER: AtomicU64 = AtomicU64::new(0);
-        static ref JOB_MAP: DashMap<u64, JobHandle<Value>> = DashMap::new();
-        static ref SYSTEM_MAP: DashMap<u64, Mutex<JobSystem<Value>>> = DashMap::new();
-        static ref JOB_KV: DashMap<String, fn(Value) -> Value> = {
-            let mut map = DashMap::new();
+        static ref JOB_MAP: DashMap<u64, JobHandle<Value, Value>> = DashMap::new();
+        static ref SYSTEM_MAP: DashMap<u64, Mutex<JobSystem<Value, Value>>> = DashMap::new();
+        static ref JOB_KV: DashMap<String, JobDef> = {
+            let map = DashMap::new();
+            map.insert("make".into(), crate::jobs::make::output as JobDef);
             map.insert(
-                String::from("make"),
-                crate::jobs::make::output as fn(Value) -> Value,
+                "clang_parse".into(),
+                crate::jobs::clangoutput::parse as JobDef,
             );
             map.insert(
-                String::from("clang_parse"),
-                crate::jobs::clangoutput::parse as fn(Value) -> Value,
+                "add_context".into(),
+                crate::jobs::filereader::read_context as JobDef,
             );
-
             map.insert(
-                String::from("add_context"),
-                crate::jobs::filereader::read_context as fn(Value) -> Value,
+                "print_error".into(),
+                crate::jobs::errormessage::display_error as JobDef,
+            );
+            map.insert(
+                "print_success".into(),
+                crate::jobs::successmessage::print_success as JobDef,
             );
             map
         };
     }
 
-    type JobDef = fn(Value) -> Value;
-
-    fn map_job_identifier(identifier: &str) -> Option<JobDef> {
-        match identifier {
-            "make" => Some(crate::jobs::make::output),
-            "clang_parse" => Some(crate::jobs::clangoutput::parse),
-            "add_context" => Some(crate::jobs::filereader::read_context),
-            _ => None,
+    pub fn map_job_identifier(identifier: &str) -> Option<JobDef> {
+        match JOB_KV.get(identifier) {
+            Some(j) => Some(j.to_owned() as JobDef),
+            None => None,
         }
     }
     macro_rules! into_raw_cstr {

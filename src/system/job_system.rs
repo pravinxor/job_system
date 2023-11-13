@@ -61,36 +61,38 @@ pub mod ffi {
 
     use super::JobSystem;
 
+    type JobDef = fn(Value) -> Value;
     lazy_static! {
         static ref ID_COUNTER: AtomicU64 = AtomicU64::new(0);
         static ref JOB_MAP: DashMap<u64, JobHandle<Value, Value>> = DashMap::new();
         static ref SYSTEM_MAP: DashMap<u64, Mutex<JobSystem<Value, Value>>> = DashMap::new();
-        static ref JOB_KV: DashMap<String, fn(Value) -> Value> = {
+        static ref JOB_KV: DashMap<String, JobDef> = {
             let map = DashMap::new();
+            map.insert("make".into(), crate::jobs::make::output as JobDef);
             map.insert(
-                String::from("make"),
-                crate::jobs::make::output as fn(Value) -> Value,
+                "clang_parse".into(),
+                crate::jobs::clangoutput::parse as JobDef,
             );
             map.insert(
-                String::from("clang_parse"),
-                crate::jobs::clangoutput::parse as fn(Value) -> Value,
+                "add_context".into(),
+                crate::jobs::filereader::read_context as JobDef,
             );
             map.insert(
-                String::from("add_context"),
-                crate::jobs::filereader::read_context as fn(Value) -> Value,
+                "print_error".into(),
+                crate::jobs::errormessage::display_error as JobDef,
+            );
+            map.insert(
+                "print_success".into(),
+                crate::jobs::successmessage::print_success as JobDef,
             );
             map
         };
     }
 
-    type JobDef = fn(Value) -> Value;
-
     pub fn map_job_identifier(identifier: &str) -> Option<JobDef> {
-        match identifier {
-            "make" => Some(crate::jobs::make::output),
-            "clang_parse" => Some(crate::jobs::clangoutput::parse),
-            "add_context" => Some(crate::jobs::filereader::read_context),
-            _ => None,
+        match JOB_KV.get(identifier) {
+            Some(j) => Some(j.to_owned() as JobDef),
+            None => None,
         }
     }
     macro_rules! into_raw_cstr {

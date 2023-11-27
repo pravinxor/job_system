@@ -85,6 +85,7 @@ pub mod ffi {
                 "print_success".into(),
                 crate::jobs::successmessage::print_success as JobDef,
             );
+            map.insert("correct".into(), crate::jobs::correct::correct as JobDef);
             map
         };
     }

@@ -76,7 +76,7 @@ fn main_cli() -> Result<(), Box<dyn Error>> {
         .flat_map(|r| print_if_err(r))
         .sum();
 
-    let res = merged_graph.execute_all();
+    let _res = merged_graph.execute_all();
     // dbg!(res);
     Ok(())
 }

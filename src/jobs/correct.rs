@@ -20,6 +20,7 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
         user: None,
         messages: vec![Message {
             role: Role::User,
+            // prompt only tested on OpenOrca models
             content: format!(
                 r#"The code chunk: "{}" causes the error: "{}". A fully JSON style response with the requirements: NO additional plain text or trailing characters, JSON schema only contains a "message" field, explaining the error (in the context of the code), and "fix" field, with an updated code chunk which ONLY fixes the specified error: "#,
                 chunk, compiler_msg
@@ -35,7 +36,6 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
         .ok_or("No message yielded")?
         .content
         .as_str();
-    dbg!(response);
     Ok(serde_json::from_str(response)?)
 }
 

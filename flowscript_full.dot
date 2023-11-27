@@ -1,0 +1,15 @@
+digraph {
+    make[shape=rectangle,data="{\"input\":{\"target\" : \"test\"}}"];
+    
+    make->clang_parse;
+    make->print_error;
+
+    clang_parse->add_context;
+    clang_parse->print_error;
+
+    add_context->correct;
+    add_context->print_error;
+
+    correct->print_success;
+    correct->print_error;
+}

@@ -6,6 +6,8 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
     let compiler_msg = error["message"].as_str().ok_or("message not found")?;
     let chunk = &error["context"];
 
+    let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains the error (in the context of the code). The "fix" field contains the full code chunk with updated changes, which ONLY fix the specified error. The JSON object: "#;
+
     let body = ChatBody {
         model: "model".into(),
         max_tokens: Some(99999),
@@ -22,8 +24,8 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
             role: Role::User,
             // prompt only tested on OpenOrca models
             content: format!(
-                r#"The code chunk: "{}" causes the error: "{}". A fully JSON style response with the requirements: NO additional plain text or trailing characters, JSON schema only contains a "message" field, explaining the error (in the context of the code), and "fix" field, with an updated code chunk which ONLY fixes the specified error: "#,
-                chunk, compiler_msg
+                r#"The code chunk: "{}" causes the error: "{}". {}"#,
+                chunk, compiler_msg, post_prompt
             ),
         }],
     };

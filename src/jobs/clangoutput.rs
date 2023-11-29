@@ -44,7 +44,7 @@ pub fn parse(input: Value) -> Value {
                     .unwrap()
                     .push(error_entry);
             } else if let Some(caps) = LINKER_EXPR.captures(line) {
-                output["linker"]["message"] = json!({"message": &caps["message"]});
+                output["linker"]["message"] = json!(&caps["message"]);
             } else if LINKER_TXT_EXPR.is_match(line) {
                 output["linker"]["symbols"]
                     .as_array_mut()

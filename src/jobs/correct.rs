@@ -41,9 +41,10 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_str(response)?)
 }
 
-pub fn correct(x: Value) -> Value {
-    let input = x["input"].to_owned();
-    let base_url = "http://localhost:4891/v1/";
+pub fn correct(input: Value) -> Value {
+    let base_url = input["base_url"]
+        .as_str()
+        .unwrap_or("http://localhost:999/v1/");
     let auth = Auth::new("not needed for a local LLM");
     let llm = OpenAI::new(auth, base_url);
 

@@ -12,8 +12,7 @@ lazy_static! {
     .unwrap();
 }
 
-pub fn parse(x: Value) -> Value {
-    let input = &x["input"];
+pub fn parse(input: Value) -> Value {
     if let Some(clang_output) = input["clang_output"].as_str() {
         let mut output = json!({"files": [], "linker": {"message" : "", "symbols": []}});
         for line in clang_output.lines() {

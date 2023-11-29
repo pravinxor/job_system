@@ -42,13 +42,20 @@ pub fn error_fix(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
 }
 
 pub fn correct(input: Value) -> Value {
-    let base_url = input["base_url"]
-        .as_str()
-        .unwrap_or("http://localhost:999/v1/");
+    let base_url = match input["base_url"].as_str() {
+        Some(url) => url,
+        None => return json!({"result" : {"message" : "no base URL provided"}, "status" : 1}),
+    };
     let auth = Auth::new("not needed for a local LLM");
     let llm = OpenAI::new(auth, base_url);
 
-    let compiler_errors = input["files"].as_array().unwrap();
+    let compiler_errors = match input["files"].as_array() {
+        Some(compiler_errors) => compiler_errors,
+        None => {
+            return json!({"result" : {"message" : "compiler errors was not found, or is not an array"}, "status" : 1})
+        }
+    };
+
     let fixes: Vec<Value> = compiler_errors
         .iter()
         .flat_map(|f| f["errors"].as_array())

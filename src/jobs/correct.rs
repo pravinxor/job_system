@@ -74,7 +74,6 @@ fn error_fix(llm: &OpenAI, content: String) -> Result<Value, Box<dyn Error>> {
 }
 
 pub fn correct(input: Value) -> Value {
-    dbg!(&input);
     let base_url = match input["base_url"].as_str() {
         Some(url) => url,
         None => return json!({"result" : {"message" : "no base URL provided"}, "status" : 1}),

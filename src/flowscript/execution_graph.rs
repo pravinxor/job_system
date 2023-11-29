@@ -61,9 +61,7 @@ impl ProcessNode {
                     .get(status as usize)
                     .and_then(|e| Some(e.target()));
                 if let Some(next_idx) = next_idx {
-                    let x = json!({"input": res});
-                    let args = ExecuteArgs(x, next_idx, graph.to_owned());
-
+                    let args = ExecuteArgs(res.to_owned().into(), next_idx, graph.to_owned());
                     Self::execute(args)
                 } else {
                     Ok(y)

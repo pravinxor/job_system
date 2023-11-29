@@ -1,5 +1,7 @@
 use std::iter::Peekable;
 
+use serde_json::{Map, Value};
+
 pub(crate) fn extract_until<T, I, P>(iter: &mut Peekable<I>, predicate: P) -> Vec<T>
 where
     I: Iterator<Item = T>,
@@ -57,3 +59,12 @@ pub trait SpliteratorAdapter: Iterator {
     }
 }
 impl<T> SpliteratorAdapter for T where T: Iterator {}
+
+pub(crate) fn merge_json(a: &Value, b: &Value) -> Value {
+    a.as_object()
+        .into_iter()
+        .chain(b.as_object().into_iter())
+        .flat_map(|x| x)
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
+}

@@ -31,9 +31,14 @@ struct ExecuteArgs(Value, NodeIndex, Arc<DiGraph<ProcessNode, usize>>);
 
 impl ProcessNode {
     pub fn execute(args: ExecuteArgs) -> Result<Value, Box<dyn Error + Send + Sync>> {
-        let x = args.0;
         let index = args.1;
         let graph = args.2;
+        let attr_json = serde_json::from_str(match graph[index].attributes.get(&Key::Data) {
+            Some(data) => data.as_str(),
+            None => "",
+        })
+        .unwrap_or_default();
+        let x = super::util::merge_json(&args.0, &attr_json);
 
         let pnode = &graph[index];
         match crate::system::job_system::ffi::map_job_identifier(&pnode.name) {
@@ -153,22 +158,11 @@ impl ExecutionGraph {
 
         let root_handles: Vec<_> = roots
             .map(|i| {
-                let input = match serde_json::from_str(
-                    self.graph[i]
-                        .attributes
-                        .get(&Key::Data)
-                        .unwrap_or(&String::default())
-                        .as_str(),
-                ) {
-                    Ok(j) => j,
-                    Err(e) => return Err(e),
-                };
-                Ok(self.system.send_job(
-                    ExecuteArgs(input, i, temp_graph.clone()),
+                self.system.send_job(
+                    ExecuteArgs(json!({}), i, temp_graph.clone()),
                     ProcessNode::execute,
-                ))
+                )
             })
-            .flatten()
             .collect();
 
         root_handles.into_iter().map(|h| h.get()).collect()

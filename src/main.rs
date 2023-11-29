@@ -3,6 +3,7 @@ mod jobs;
 mod system;
 
 use clap::Parser;
+use serde_json::{json, Value};
 
 use crate::{
     flowscript::execution_graph::ExecutionGraph, flowscript::tokenizer::TokenizerAdapter,
@@ -32,6 +33,10 @@ where
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    main_cli()
+}
+
+fn main_cli() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let mut parser_system = JobSystem::new();
@@ -72,6 +77,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .sum();
 
     let _res = merged_graph.execute_all();
-
+    // dbg!(res);
     Ok(())
 }

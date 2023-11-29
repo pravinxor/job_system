@@ -31,7 +31,7 @@ fn replace_entries(filename: &str, error_array: &mut Vec<Value>) -> Result<(), V
 
 /// Adds context to the file error, but including the line of the error as well as 2 lines below and above
 pub fn read_context(x: Value) -> Value {
-    let mut output = x["input"].to_owned();
+    let mut output = x;
     if let Some(files) = output["files"].as_array_mut() {
         for file in files {
             let filename = match file["filename"].as_str() {

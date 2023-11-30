@@ -2,7 +2,7 @@ use openai_api_rust::{chat::*, *};
 use serde_json::{json, Value};
 use std::error::Error;
 
-fn fix_linker_err(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
+fn fix_linker_err(llm: &OpenAI, error: &Value, prompt: &str) -> Result<Value, Box<dyn Error>> {
     let linker_msg = error["message"].as_str().ok_or("message not found")?;
 
     if linker_msg.is_empty() {
@@ -19,7 +19,8 @@ fn fix_linker_err(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> 
             acc.push('\n');
             acc
         });
-    let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains what the linker error means. The "fix" field contains an action that a programmer could do to directly resolve the error. The JSON object: "#;
+    // let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains what the linker error means. The "fix" field contains an action that a programmer could do to directly resolve the error. The JSON object: "#;
+    let post_prompt = prompt;
 
     let content = format!(
         r#"The following linker error: "{}" with the related symbols: "{}". {}"#,
@@ -28,11 +29,12 @@ fn fix_linker_err(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> 
     error_fix(llm, content)
 }
 
-fn fix_compile_err(llm: &OpenAI, error: &Value) -> Result<Value, Box<dyn Error>> {
+fn fix_compile_err(llm: &OpenAI, error: &Value, prompt: &str) -> Result<Value, Box<dyn Error>> {
     let compiler_msg = error["message"].as_str().ok_or("message not found")?;
     let chunk = &error["context"];
 
-    let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains the error (in the context of the code). The "fix" field contains the full code chunk with updated changes, which ONLY fix the specified error. The JSON object: "#;
+    // let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains the error (in the context of the code). The "fix" field contains the full code chunk with updated changes, which ONLY fix the specified error. The JSON object: "#;
+    let post_prompt = prompt;
 
     let content = format!(
         r#"The code chunk: "{}" causes the error: "{}". {}"#,
@@ -74,12 +76,27 @@ fn error_fix(llm: &OpenAI, content: String) -> Result<Value, Box<dyn Error>> {
 }
 
 pub fn correct(input: Value) -> Value {
+    dbg!(&input);
     let base_url = match input["base_url"].as_str() {
         Some(url) => url,
         None => return json!({"result" : {"message" : "no base URL provided"}, "status" : 1}),
     };
     let auth = Auth::new("not needed for a local LLM");
     let llm = OpenAI::new(auth, base_url);
+
+    let compiler_err_prompt = match input["compiler_err_prompt"].as_str() {
+        Some(prompt) => prompt,
+        None => {
+            return json!({"result" : {"message" : "compiler_err_prompt was not passed into job"}, "status" : 1})
+        }
+    };
+
+    let linker_err_prompt = match input["linker_err_prompt"].as_str() {
+        Some(prompt) => prompt,
+        None => {
+            return json!({"result" : {"message" : "linker_err_prompt was not passed into job"}, "status" : 1})
+        }
+    };
 
     let compiler_errors = match input["files"].as_array() {
         Some(compiler_errors) => compiler_errors,
@@ -88,7 +105,7 @@ pub fn correct(input: Value) -> Value {
         }
     };
 
-    let linker_fixes = match fix_linker_err(&llm, &input["linker"]) {
+    let linker_fixes = match fix_linker_err(&llm, &input["linker"], linker_err_prompt) {
         Ok(fixes) => fixes,
         Err(e) => return json!({"result" : {"message" : e.to_string()}, "status" : 1}),
     };
@@ -97,7 +114,7 @@ pub fn correct(input: Value) -> Value {
         .iter()
         .flat_map(|f| f["errors"].as_array())
         .flatten()
-        .map(|e| fix_compile_err(&llm, e))
+        .map(|e| fix_compile_err(&llm, e, compiler_err_prompt))
         .filter_map(|f| {
             if let Err(e) = f {
                 eprintln!("Parsing error: {}", e);

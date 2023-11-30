@@ -9,7 +9,7 @@ digraph {
     add_context->correct;
     add_context->print_error;
 
-    correct[data="{\"base_url\" :\ \"http://localhost:4891/v1/\"}"];
+    correct[data="{\"base_url\" :\ \"http://localhost:4891/v1/\", \"linker_err_prompt\" : \"A fully JSON response with the schema: {\\\"message\\\": string, \\\"fix\\\": string} and no additional plaintext characters. The \\\"message\\\" field explains what the linker error means. The \\\"fix\\\" field contains an action that a programmer could do to directly resolve the error. The JSON object: \", \"compiler_err_prompt\": \"A fully JSON response with the schema: {\\\"message\\\": string, \\\"fix\\\": string} and no additional plaintext characters. The \\\"message\\\" field explains the error (in the context of the code). The \\\"fix\\\" field contains the full code chunk with updated changes, which ONLY fix the specified error. The JSON object:  \"}"];
     correct->print_success;
     correct->print_error;
 }

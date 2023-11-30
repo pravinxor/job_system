@@ -66,7 +66,7 @@ where
         .is_some()
     {
         let c = iter.next().unwrap();
-        is_escaped = c == '\\';
+        is_escaped = !is_escaped && c == '\\';
 
         if !is_escaped {
             s.push(c)

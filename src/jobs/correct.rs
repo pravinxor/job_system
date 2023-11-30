@@ -19,12 +19,10 @@ fn fix_linker_err(llm: &OpenAI, error: &Value, prompt: &str) -> Result<Value, Bo
             acc.push('\n');
             acc
         });
-    // let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains what the linker error means. The "fix" field contains an action that a programmer could do to directly resolve the error. The JSON object: "#;
-    let post_prompt = prompt;
 
     let content = format!(
         r#"The following linker error: "{}" with the related symbols: "{}". {}"#,
-        linker_msg, sym_messages, post_prompt
+        linker_msg, sym_messages, prompt
     );
     error_fix(llm, content)
 }
@@ -33,12 +31,9 @@ fn fix_compile_err(llm: &OpenAI, error: &Value, prompt: &str) -> Result<Value, B
     let compiler_msg = error["message"].as_str().ok_or("message not found")?;
     let chunk = &error["context"];
 
-    // let post_prompt = r#"A fully JSON response with the schema: {"message": string, "fix": string} and no additional plaintext characters. The message field explains the error (in the context of the code). The "fix" field contains the full code chunk with updated changes, which ONLY fix the specified error. The JSON object: "#;
-    let post_prompt = prompt;
-
     let content = format!(
         r#"The code chunk: "{}" causes the error: "{}". {}"#,
-        chunk, compiler_msg, post_prompt
+        chunk, compiler_msg, prompt
     );
 
     error_fix(llm, content)
